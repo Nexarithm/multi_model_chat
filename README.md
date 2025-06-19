@@ -1,1 +1,1 @@
-# multi_model_chat
+# Multi-Model AI Chat App via ProxAI
