@@ -21,10 +21,14 @@
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
 
-        function addMessage(message, isUser = false) {
+        function addMessage(message, isUser = false, isHtml = false) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-            messageDiv.textContent = message;
+            if (isHtml) {
+                messageDiv.innerHTML = message;
+            } else {
+                messageDiv.textContent = message;
+            }
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
@@ -67,6 +71,26 @@
             }
         });
 
+        async function loadModels() {
+            addMessage('Loading models...', false);
+            
+            try {
+                const response = await fetch('/models');
+                const data = await response.json();
+                
+                if (data.models && data.models.length > 0) {
+                    const modelBullets = data.models.map(m => `• ${m.display_name}`).join('<br>');
+                    addMessage(`Available models:<br>${modelBullets}`, false, true);
+                    addMessage('Chat is ready! Using Claude Haiku 3.5 for responses.', false);
+                } else {
+                    addMessage('No models available. Using default configuration.', false);
+                }
+            } catch (error) {
+                addMessage('Error loading models. Using default configuration.', false);
+            }
+        }
+
+        loadModels();
         messageInput.focus();
     </script>
 </body>
