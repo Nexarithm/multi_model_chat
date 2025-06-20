@@ -54,6 +54,13 @@
                 if (data.error) {
                     addMessage('Error: ' + data.error, false);
                 } else {
+                    // Show timing information if available
+                    if (data.timing_info) {
+                        const timingHtml = data.timing_info.replace(/\n/g, '<br>');
+                        addMessage(timingHtml, false, true);
+                        addMessage(`Selected response from: ${data.chosen_model}`, false);
+                        addMessage('─'.repeat(50), false);
+                    }
                     addMessage(data.response, false);
                 }
             } catch (error) {

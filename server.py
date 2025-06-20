@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import json
 import proxai as px
+import concurrent.futures
+import time
+import random
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -11,22 +14,22 @@ def get_largest_models():
     """Get the largest models from each provider, excluding deepseek-r1"""
     try:
         largest_models = px.models.list_models(model_size='largest')
-        
+
         selected_models = []
         for model in largest_models:
             provider = model.provider
             model_name = model.model
-            
+
             # Skip deepseek-r1, prefer deepseek-v3
             if provider == 'deepseek' and model_name == 'deepseek-r1':
                 continue
-                
+
             selected_models.append({
                 'provider': provider,
                 'model': model_name,
                 'display_name': f"{provider.title()} {model_name.replace('-', ' ').title()}"
             })
-        
+
         # Add deepseek-v3 if deepseek is available but we filtered out r1
         if any(m['provider'] == 'deepseek' for m in selected_models) == False:
             try:
@@ -40,12 +43,60 @@ def get_largest_models():
                     })
             except:
                 pass
-        
+
         return selected_models
-        
+
     except Exception as e:
         print(f"Error loading models: {e}")
         return []
+
+def query_single_model(model, user_message, chat_history):
+    """Query a single model and return result with timing"""
+    try:
+        start_time = time.time()
+
+        response = px.generate_text(
+            system="You are a helpful AI assistant. Be conversational and engaging.",
+            messages=chat_history,
+            provider_model=(model['provider'], model['model']),
+            max_tokens=500,
+            temperature=0.7
+        )
+
+        end_time = time.time()
+        return {
+            'model': model,
+            'response': response,
+            'time_taken': round(end_time - start_time, 2),
+            'success': True
+        }
+    except Exception as e:
+        end_time = time.time()
+        return {
+            'model': model,
+            'response': None,
+            'time_taken': round(end_time - start_time, 2),
+            'success': False,
+            'error': str(e)
+        }
+
+def query_all_models_parallel(available_models, user_message, chat_history):
+    """Query all models in parallel and return results"""
+    results = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(available_models)) as executor:
+        # Submit all tasks
+        future_to_model = {
+            executor.submit(query_single_model, model, user_message, chat_history): model
+            for model in available_models
+        }
+
+        # Collect results as they complete
+        for future in concurrent.futures.as_completed(future_to_model):
+            result = future.result()
+            results.append(result)
+
+    return results
 
 class ChatHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -84,20 +135,45 @@ class ChatHandler(BaseHTTPRequestHandler):
                 self.send_response(400)
             else:
                 try:
-                    global chat_history
+                    global chat_history, available_models
                     chat_history.append({"role": "user", "content": user_message})
 
-                    bot_response = px.generate_text(
-                        system="You are a helpful AI assistant. Be conversational and engaging.",
-                        messages=chat_history,
-                        provider_model=('claude', 'haiku-3.5'),
-                        max_tokens=500,
-                        temperature=0.7
-                    )
+                    # Query all models in parallel
+                    start_total_time = time.time()
+                    results = query_all_models_parallel(available_models, user_message, chat_history)
+                    total_time = round(time.time() - start_total_time, 2)
 
-                    chat_history.append({"role": "assistant", "content": bot_response})
-                    response = {'response': bot_response}
-                    self.send_response(200)
+                    # Filter successful responses
+                    successful_results = [r for r in results if r['success']]
+                    failed_results = [r for r in results if not r['success']]
+
+                    if successful_results:
+                        # Pick a random successful response
+                        chosen_result = random.choice(successful_results)
+
+                        # Create timing summary
+                        timing_info = []
+                        for result in successful_results:
+                            timing_info.append(f"✓ {result['model']['display_name']}: {result['time_taken']}s")
+                        for result in failed_results:
+                            timing_info.append(f"✗ {result['model']['display_name']}: failed ({result['time_taken']}s)")
+
+                        timing_summary = f"Queried {len(results)} models in {total_time}s:\n" + "\n".join(timing_info)
+                        chosen_response = chosen_result['response']
+
+                        chat_history.append({"role": "assistant", "content": chosen_response})
+
+                        response = {
+                            'response': chosen_response,
+                            'timing_info': timing_summary,
+                            'chosen_model': chosen_result['model']['display_name'],
+                            'successful_count': len(successful_results),
+                            'total_count': len(results)
+                        }
+                        self.send_response(200)
+                    else:
+                        response = {'error': 'All models failed to respond'}
+                        self.send_response(500)
 
                 except Exception as e:
                     print(f"Error calling ProxAI: {e}")
@@ -113,7 +189,7 @@ def run_server():
     print("Loading available models...")
     available_models = get_largest_models()
     print(f"Loaded {len(available_models)} models")
-    
+
     server_address = ('localhost', 3000)
     httpd = HTTPServer(server_address, ChatHandler)
     print("Server running on http://localhost:3000")
