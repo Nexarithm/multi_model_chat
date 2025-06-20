@@ -93,3 +93,118 @@ h1 {
     background-color: #c7b8a6;
     cursor: not-allowed;
 }
+
+/* Entry Page Styles */
+.loading-section {
+    text-align: center;
+    padding: 60px 24px;
+}
+
+.loading-message {
+    font-size: 18px;
+    color: #8b7355;
+    margin-bottom: 24px;
+}
+
+.loading-message.error {
+    color: #c44536;
+}
+
+.model-selection {
+    padding: 24px;
+}
+
+.model-selection h2 {
+    color: #8b7355;
+    margin: 0 0 24px 0;
+    font-size: 20px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.model-list {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #e6e0d8;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+    background-color: #fefdfb;
+}
+
+.model-checkbox-container {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0ede8;
+}
+
+.model-checkbox-container:last-child {
+    border-bottom: none;
+}
+
+.model-checkbox-container input[type="checkbox"] {
+    margin-right: 12px;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.model-label {
+    cursor: pointer;
+    color: #2c2318;
+    font-size: 13px;
+    user-select: none;
+}
+
+.model-label:hover {
+    color: #8b7355;
+}
+
+.selection-controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 32px;
+}
+
+.control-button {
+    padding: 8px 16px;
+    background-color: #f0ede8;
+    color: #8b7355;
+    border: 1px solid #d4c5b0;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.control-button:hover {
+    background-color: #e6e0d8;
+}
+
+.start-container {
+    text-align: center;
+}
+
+.start-button {
+    padding: 16px 32px;
+    background-color: #8b7355;
+    color: #f8f6f3;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-family: inherit;
+    font-weight: 500;
+    min-width: 140px;
+}
+
+.start-button:hover {
+    background-color: #6b5a42;
+}
+
+.start-button:disabled {
+    background-color: #c7b8a6;
+    cursor: not-allowed;
+}

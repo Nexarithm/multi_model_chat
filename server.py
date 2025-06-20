@@ -129,18 +129,22 @@ class ChatHandler(BaseHTTPRequestHandler):
             data = json.loads(post_data.decode('utf-8'))
 
             user_message = data.get('message', '').strip()
+            selected_models = data.get('selected_models', [])
 
             if not user_message:
                 response = {'error': 'Message cannot be empty'}
                 self.send_response(400)
+            elif not selected_models:
+                response = {'error': 'No models selected'}
+                self.send_response(400)
             else:
                 try:
-                    global chat_history, available_models
+                    global chat_history
                     chat_history.append({"role": "user", "content": user_message})
 
-                    # Query all models in parallel
+                    # Query selected models in parallel
                     start_total_time = time.time()
-                    results = query_all_models_parallel(available_models, user_message, chat_history)
+                    results = query_all_models_parallel(selected_models, user_message, chat_history)
                     total_time = round(time.time() - start_total_time, 2)
 
                     # Filter successful responses

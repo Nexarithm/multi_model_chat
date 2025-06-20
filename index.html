@@ -3,12 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Chat</title>
+    <title>Multi-Model AI Chat</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="chat-container">
-        <h1>Simple Chat</h1>
+    <!-- Entry Page -->
+    <div id="entry-page" class="chat-container">
+        <h1>Multi-Model AI Chat</h1>
+        <div id="loading-section" class="loading-section">
+            <div class="loading-message">Loading available AI models...</div>
+        </div>
+        <div id="model-selection" class="model-selection" style="display: none;">
+            <h2>Select Models to Query</h2>
+            <div id="model-list" class="model-list"></div>
+            <div class="selection-controls">
+                <button id="select-all" class="control-button">Select All</button>
+                <button id="deselect-all" class="control-button">Deselect All</button>
+            </div>
+            <div class="start-container">
+                <button id="start-chat" class="start-button">Start Chat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Page -->
+    <div id="chat-page" class="chat-container" style="display: none;">
+        <h1>Multi-Model AI Chat</h1>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="input-container">
             <input type="text" id="message-input" placeholder="Type your message here..." maxlength="500">
@@ -17,9 +37,22 @@
     </div>
 
     <script>
+        // Page elements
+        const entryPage = document.getElementById('entry-page');
+        const chatPage = document.getElementById('chat-page');
+        const loadingSection = document.getElementById('loading-section');
+        const modelSelection = document.getElementById('model-selection');
+        const modelList = document.getElementById('model-list');
+        const startChatButton = document.getElementById('start-chat');
+        const selectAllButton = document.getElementById('select-all');
+        const deselectAllButton = document.getElementById('deselect-all');
+        
         const chatMessages = document.getElementById('chat-messages');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
+
+        let availableModels = [];
+        let selectedModels = [];
 
         function addMessage(message, isUser = false, isHtml = false) {
             const messageDiv = document.createElement('div');
@@ -31,6 +64,73 @@
             }
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function createModelCheckbox(model) {
+            const checkboxContainer = document.createElement('div');
+            checkboxContainer.className = 'model-checkbox-container';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `model-${model.provider}-${model.model}`;
+            checkbox.checked = true; // All selected by default
+            checkbox.value = JSON.stringify(model);
+            
+            const label = document.createElement('label');
+            label.htmlFor = checkbox.id;
+            label.textContent = model.display_name;
+            label.className = 'model-label';
+            
+            checkboxContainer.appendChild(checkbox);
+            checkboxContainer.appendChild(label);
+            
+            return checkboxContainer;
+        }
+
+        function updateSelectedModels() {
+            const checkboxes = modelList.querySelectorAll('input[type="checkbox"]');
+            selectedModels = Array.from(checkboxes)
+                .filter(cb => cb.checked)
+                .map(cb => JSON.parse(cb.value));
+            
+            startChatButton.disabled = selectedModels.length === 0;
+        }
+
+        async function loadModels() {
+            try {
+                const response = await fetch('/models');
+                const data = await response.json();
+                
+                if (data.models && data.models.length > 0) {
+                    availableModels = data.models;
+                    
+                    // Sort models alphabetically by display name
+                    const sortedModels = data.models.sort((a, b) => a.display_name.localeCompare(b.display_name));
+                    
+                    // Create model checkboxes
+                    modelList.innerHTML = '';
+                    sortedModels.forEach(model => {
+                        const checkboxElement = createModelCheckbox(model);
+                        modelList.appendChild(checkboxElement);
+                    });
+                    
+                    // Add event listeners to checkboxes
+                    const checkboxes = modelList.querySelectorAll('input[type="checkbox"]');
+                    checkboxes.forEach(cb => {
+                        cb.addEventListener('change', updateSelectedModels);
+                    });
+                    
+                    updateSelectedModels();
+                    
+                    // Show model selection
+                    loadingSection.style.display = 'none';
+                    modelSelection.style.display = 'block';
+                } else {
+                    loadingSection.innerHTML = '<div class="loading-message error">No models available. Please try again later.</div>';
+                }
+            } catch (error) {
+                loadingSection.innerHTML = '<div class="loading-message error">Error loading models. Please try again later.</div>';
+            }
         }
 
         async function sendMessage() {
@@ -47,14 +147,16 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ message: message })
+                    body: JSON.stringify({ 
+                        message: message,
+                        selected_models: selectedModels 
+                    })
                 });
 
                 const data = await response.json();
                 if (data.error) {
                     addMessage('Error: ' + data.error, false);
                 } else {
-                    // Show timing information if available
                     if (data.timing_info) {
                         const timingHtml = data.timing_info.replace(/\n/g, '<br>');
                         addMessage(timingHtml, false, true);
@@ -71,6 +173,27 @@
             }
         }
 
+        // Event listeners
+        startChatButton.addEventListener('click', () => {
+            if (selectedModels.length > 0) {
+                entryPage.style.display = 'none';
+                chatPage.style.display = 'block';
+                messageInput.focus();
+            }
+        });
+
+        selectAllButton.addEventListener('click', () => {
+            const checkboxes = modelList.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = true);
+            updateSelectedModels();
+        });
+
+        deselectAllButton.addEventListener('click', () => {
+            const checkboxes = modelList.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = false);
+            updateSelectedModels();
+        });
+
         sendButton.addEventListener('click', sendMessage);
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -78,27 +201,8 @@
             }
         });
 
-        async function loadModels() {
-            addMessage('Loading models...', false);
-            
-            try {
-                const response = await fetch('/models');
-                const data = await response.json();
-                
-                if (data.models && data.models.length > 0) {
-                    const modelBullets = data.models.map(m => `• ${m.display_name}`).join('<br>');
-                    addMessage(`Available models:<br>${modelBullets}`, false, true);
-                    addMessage('Chat is ready! Using Claude Haiku 3.5 for responses.', false);
-                } else {
-                    addMessage('No models available. Using default configuration.', false);
-                }
-            } catch (error) {
-                addMessage('Error loading models. Using default configuration.', false);
-            }
-        }
-
+        // Initialize
         loadModels();
-        messageInput.focus();
     </script>
 </body>
 </html>
