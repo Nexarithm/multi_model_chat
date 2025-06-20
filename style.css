@@ -238,3 +238,51 @@ h1 {
     background-color: #c7b8a6;
     cursor: not-allowed;
 }
+
+/* Metadata Box Styles */
+.metadata-box {
+    display: flex;
+    gap: 24px;
+    padding: 16px 24px;
+    background-color: #f8f6f3;
+    border-bottom: 1px solid #e6e0d8;
+    flex-wrap: wrap;
+}
+
+.metadata-section {
+    flex: 1;
+    min-width: 200px;
+}
+
+.metadata-section h4 {
+    margin: 0 0 8px 0;
+    color: #8b7355;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.models-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.model-tag {
+    background-color: #d4c5b0;
+    color: #2c2318;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.combiner-display {
+    background-color: #8b7355;
+    color: #f8f6f3;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    display: inline-block;
+}

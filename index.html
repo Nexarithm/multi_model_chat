@@ -35,6 +35,16 @@
     <!-- Chat Page -->
     <div id="chat-page" class="chat-container" style="display: none;">
         <h1>Multi-Model AI Chat</h1>
+        <div id="metadata-box" class="metadata-box">
+            <div class="metadata-section">
+                <h4>Selected Models</h4>
+                <div id="selected-models-list" class="models-list"></div>
+            </div>
+            <div class="metadata-section">
+                <h4>Combiner Model</h4>
+                <div id="combiner-model-display" class="combiner-display"></div>
+            </div>
+        </div>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="input-container">
             <input type="text" id="message-input" placeholder="Type your message here..." maxlength="500">
@@ -57,6 +67,8 @@
         const chatMessages = document.getElementById('chat-messages');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
+        const selectedModelsList = document.getElementById('selected-models-list');
+        const combinerModelDisplay = document.getElementById('combiner-model-display');
 
         let availableModels = [];
         let selectedModels = [];
@@ -112,6 +124,22 @@
 
         function updateStartButton() {
             startChatButton.disabled = selectedModels.length === 0 || !combinerModel;
+        }
+
+        function updateMetadataDisplay() {
+            // Update selected models list
+            selectedModelsList.innerHTML = '';
+            selectedModels.forEach(model => {
+                const modelTag = document.createElement('span');
+                modelTag.className = 'model-tag';
+                modelTag.textContent = model.display_name;
+                selectedModelsList.appendChild(modelTag);
+            });
+
+            // Update combiner model display
+            if (combinerModel) {
+                combinerModelDisplay.textContent = combinerModel.display_name;
+            }
         }
 
         async function loadModels() {
@@ -230,6 +258,7 @@
         // Event listeners
         startChatButton.addEventListener('click', () => {
             if (selectedModels.length > 0 && combinerModel) {
+                updateMetadataDisplay();
                 entryPage.style.display = 'none';
                 chatPage.style.display = 'block';
                 messageInput.focus();
