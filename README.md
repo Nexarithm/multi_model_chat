@@ -2,7 +2,9 @@
 
 Query multiple AI models simultaneously and get one intelligent combined response. Built entirely with **Claude Code** and **[ProxAI](https://www.proxai.co)**.
 
-**This repo created via Vibe Coding! Zero hands-on code changes made!**
+<div align="center">
+<strong>⭐⭐ This repo created via Vibe Coding! Zero hands-on code changes made! ⭐⭐</strong>
+</div>
 
 ## What It Does
 
