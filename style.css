@@ -125,6 +125,9 @@ h1 {
     font-family: inherit;
     background-color: #fefdfb;
     color: #2c2318;
+    resize: vertical;
+    min-height: 42px;
+    max-height: 200px;
 }
 
 #message-input:focus {

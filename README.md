@@ -20,6 +20,14 @@ Query multiple AI models simultaneously and get one intelligent combined respons
 ## Quick Start
 
 ```bash
+# Clone repository
+git clone https://github.com/Nexarithm/multi_model_chat.git
+cd multi_model_chat
+
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
 # Install
 pip install proxai
 
@@ -39,15 +47,6 @@ open http://localhost:3000
 <img src="use_case.gif" alt="AI Chat on Steroids Demo" width="100%">
 </div>
 
-## Pro Tip: Use ProxDash
-
-Get better tracking and cost control with [ProxDash](https://www.proxai.co):
-
-```bash
-export PROXDASH_API_KEY="your-key"
-python3 server.py
-```
-
 ## Why ProxAI?
 
 ✅ One API for 10+ AI providers
@@ -56,6 +55,15 @@ python3 server.py
 ✅ Advanced monitoring
 
 Learn more: [proxai.co](https://www.proxai.co)
+
+## Pro Tip: Use ProxDash
+
+Get better tracking and cost control with [ProxDash](https://www.proxai.co):
+
+```bash
+export PROXDASH_API_KEY="your-key"
+python3 server.py
+```
 
 ---
 

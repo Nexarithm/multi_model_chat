@@ -72,7 +72,7 @@
         </div>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="input-container">
-            <input type="text" id="message-input" placeholder="Type your message here...">
+            <textarea id="message-input" placeholder="Type your message here..." rows="3"></textarea>
             <button id="send-button">Send</button>
         </div>
     </div>
@@ -88,13 +88,13 @@
         const selectAllButton = document.getElementById('select-all');
         const deselectAllButton = document.getElementById('deselect-all');
         const combinerModelSelect = document.getElementById('combiner-model');
-        
+
         const chatMessages = document.getElementById('chat-messages');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
         const selectedModelsList = document.getElementById('selected-models-list');
         const combinerModelDisplay = document.getElementById('combiner-model-display');
-        
+
         // Status display elements
         const statusDisplay = document.getElementById('status-display');
         const statusMessage = document.getElementById('status-message');
@@ -115,57 +115,57 @@
             // Bold text **text** or __text__
             html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
-            
+
             // Italic text *text* or _text_
             html = html.replace(/(?<!\*)\*(?!\*)([^*]+)\*(?!\*)/g, '<em>$1</em>');
             html = html.replace(/(?<!_)_(?!_)([^_]+)_(?!_)/g, '<em>$1</em>');
-            
+
             // Code inline `code`
             html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-            
+
             return html;
         }
 
         function processBulletLists(html) {
             // Handle bullet points (lines starting with - or *)
             html = html.replace(/^[\s]*[-*]\s+(.+)$/gm, '<li>$1</li>');
-            
+
             // Wrap consecutive list items in <ul>
             html = html.replace(/(<li>.*?<\/li>)(?:\s*<br>\s*<li>.*?<\/li>)*/g, function(match) {
                 const listItems = match.replace(/<br>\s*/g, '');
                 return '<ul>' + listItems + '</ul>';
             });
-            
+
             return html;
         }
 
         function processNumberedLists(html) {
             // Handle numbered lists (lines starting with numbers)
             html = html.replace(/^[\s]*\d+\.\s+(.+)$/gm, '<li>$1</li>');
-            
+
             // Wrap consecutive numbered list items in <ol>
             html = html.replace(/(<li>.*?<\/li>)(?:\s*<br>\s*(?=\d+\.\s))/g, function(match) {
                 return match.replace(/<br>\s*/g, '');
             });
-            
+
             return html;
         }
 
         function parseMarkdown(text) {
             // Handle newlines first
             let html = text.replace(/\n/g, '<br>');
-            
+
             html = applyBasicFormatting(html);
             html = processBulletLists(html);
             html = processNumberedLists(html);
-            
+
             return html;
         }
 
         function addMessage(message, isUser = false, isHtml = false) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-            
+
             if (isUser) {
                 // User messages - plain text
                 messageDiv.textContent = message;
@@ -177,7 +177,7 @@
                     messageDiv.innerHTML = parseMarkdown(message);
                 }
             }
-            
+
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
@@ -185,21 +185,21 @@
         function createModelCheckbox(model) {
             const checkboxContainer = document.createElement('div');
             checkboxContainer.className = 'model-checkbox-container';
-            
+
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.id = `model-${model.provider}-${model.model}`;
             checkbox.checked = true; // All selected by default
             checkbox.value = JSON.stringify(model);
-            
+
             const label = document.createElement('label');
             label.htmlFor = checkbox.id;
             label.textContent = model.display_name;
             label.className = 'model-label';
-            
+
             checkboxContainer.appendChild(checkbox);
             checkboxContainer.appendChild(label);
-            
+
             return checkboxContainer;
         }
 
@@ -208,7 +208,7 @@
             selectedModels = Array.from(checkboxes)
                 .filter(cb => cb.checked)
                 .map(cb => JSON.parse(cb.value));
-            
+
             updateStartButton();
         }
 
@@ -258,27 +258,27 @@
 
         function findDefaultCombiner(models) {
             // Look for Gemini models first
-            let defaultCombiner = models.find(model => 
+            let defaultCombiner = models.find(model =>
                 model.display_name.toLowerCase().includes('gemini')
             );
-            
+
             // If no Gemini, look for OpenAI models
             if (!defaultCombiner) {
-                defaultCombiner = models.find(model => 
-                    model.provider.toLowerCase().includes('openai') || 
+                defaultCombiner = models.find(model =>
+                    model.provider.toLowerCase().includes('openai') ||
                     model.display_name.toLowerCase().includes('openai') ||
                     model.display_name.toLowerCase().includes('gpt')
                 );
             }
-            
+
             // If no OpenAI, look for Claude models
             if (!defaultCombiner) {
-                defaultCombiner = models.find(model => 
-                    model.provider.toLowerCase().includes('claude') || 
+                defaultCombiner = models.find(model =>
+                    model.provider.toLowerCase().includes('claude') ||
                     model.display_name.toLowerCase().includes('claude')
                 );
             }
-            
+
             return defaultCombiner;
         }
 
@@ -303,19 +303,19 @@
             try {
                 const response = await fetch('/models');
                 const data = await response.json();
-                
+
                 if (data.models && data.models.length > 0) {
                     availableModels = data.models;
                     const sortedModels = data.models.sort((a, b) => a.display_name.localeCompare(b.display_name));
-                    
+
                     populateModelCheckboxes(sortedModels);
                     populateCombinerDropdown(sortedModels);
-                    
+
                     const defaultCombiner = findDefaultCombiner(sortedModels);
                     if (defaultCombiner) {
                         combinerModelSelect.value = JSON.stringify(defaultCombiner);
                     }
-                    
+
                     setupModelEventListeners();
                     updateSelectedModels();
                     updateCombinerModel();
@@ -335,7 +335,7 @@
             addMessage(message, true);
             messageInput.value = '';
             sendButton.disabled = true;
-            
+
             return message;
         }
 
@@ -345,7 +345,7 @@
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     message: message,
                     selected_models: selectedModels,
                     combiner_model: combinerModel
@@ -369,12 +369,12 @@
             return new Promise((resolve, reject) => {
                 const checkJob = async () => {
                     const job = await pollJobStatus(jobId);
-                    
+
                     if (!job) {
                         reject(new Error('Failed to poll job status'));
                         return;
                     }
-                    
+
                     if (job.status === 'completed') {
                         resolve(job.result);
                     } else if (job.status === 'error') {
@@ -384,7 +384,7 @@
                         setTimeout(checkJob, 1000); // Check every second
                     }
                 };
-                
+
                 checkJob();
             });
         }
@@ -441,7 +441,7 @@
             statusMessage.textContent = message;
 
             // Update progress bar
-            const percentage = progress.total_models > 0 ? 
+            const percentage = progress.total_models > 0 ?
                 (progress.completed_models / progress.total_models) * 100 : 0;
             progressFill.style.width = `${percentage}%`;
             progressText.textContent = `${progress.completed_models}/${progress.total_models}`;
@@ -478,7 +478,7 @@
                 const response = await fetch('/progress');
                 const progress = await response.json();
                 updateStatusDisplay(progress);
-                
+
                 if (!progress.is_processing || progress.current_stage === 'completed') {
                     clearInterval(progressPollingInterval);
                     progressPollingInterval = null;
@@ -506,25 +506,25 @@
             try {
                 // Send chat request to get job ID
                 const data = await sendChatRequest(message);
-                
+
                 if (data.error) {
                     addMessage('Error: ' + data.error, false);
                     hideStatus();
                     resetMessageInput();
                     return;
                 }
-                
+
                 if (!data.job_id) {
                     addMessage('Error: No job ID received', false);
                     hideStatus();
                     resetMessageInput();
                     return;
                 }
-                
+
                 // Wait for job completion
                 const result = await waitForJobCompletion(data.job_id);
                 addMessage(result, false);
-                
+
             } catch (error) {
                 console.error('Chat error:', error);
                 addMessage('Error: ' + error.message, false);
@@ -556,7 +556,8 @@
         }
 
         function handleKeyPress(e) {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
                 sendMessage();
             }
         }
