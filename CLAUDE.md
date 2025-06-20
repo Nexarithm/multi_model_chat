@@ -16,6 +16,9 @@ pip install proxai
 ```
 The application requires the `proxai` library for multi-model AI interactions.
 
+**Environment variables:**
+- `PROXDASH_API_KEY` (optional) - API key for ProxAI dashboard integration
+
 **Check server logs:**
 The server provides detailed colored logging output showing model loading, query progress, and response timing. Monitor the console for real-time status updates.
 
@@ -30,6 +33,8 @@ This is a multi-model AI chat application that allows users to query multiple AI
 - Handles parallel querying of selected models using `concurrent.futures.ThreadPoolExecutor`
 - Implements response combination using a designated "combiner model" 
 - Maintains chat history as a global list of message objects
+- Manages asynchronous job processing with unique job IDs
+- Provides real-time progress tracking for multi-model queries
 - Serves static files (HTML/CSS) and provides REST API endpoints
 
 **index.html** - Single-page web application with:
@@ -47,9 +52,12 @@ This is a multi-model AI chat application that allows users to query multiple AI
 
 **Chat Flow:**
 1. User message sent to `/chat` endpoint with selected models and combiner model
-2. Backend queries all selected models in parallel using `query_all_models_parallel()`
-3. Successful responses are combined using the combiner model with a synthesis prompt
-4. Combined response is added to chat history and returned to frontend
+2. Backend creates a unique job ID and starts asynchronous processing
+3. Frontend polls `/job/{job_id}` endpoint for status updates
+4. Backend queries all selected models in parallel using `query_all_models_parallel()`
+5. Progress is tracked and available via `/progress` endpoint for real-time updates
+6. Successful responses are combined using the combiner model with a synthesis prompt
+7. Combined response is added to chat history and returned to frontend via job completion
 
 ### ProxAI Integration
 
@@ -70,10 +78,18 @@ Model responses include timing information and error handling for failed queries
 ## Key Functions and Entry Points
 
 **server.py key functions:**
-- `get_largest_models()` - Fetches and filters available AI models from ProxAI (server.py:79)
-- `query_all_models_parallel()` - Executes parallel queries to selected models (server.py:169)
-- `_process_chat_models()` - Main chat processing logic with response combination (server.py:323)
-- `run_server()` - Server initialization and startup (server.py:394)
+- `get_largest_models()` - Fetches and filters available AI models from ProxAI 
+- `query_all_models_parallel()` - Executes parallel queries to selected models
+- `_process_chat_models()` - Main chat processing logic with response combination
+- `create_job()` / `get_job()` / `update_job()` - Job management system for async processing
+- `log_message()` - Pretty colored logging with timestamps and formatting
+- `run_server()` - Server initialization and startup
+
+**API Endpoints:**
+- `GET /models` - Returns available AI models from ProxAI
+- `POST /chat` - Initiates chat processing and returns job ID
+- `GET /job/{job_id}` - Returns job status and results
+- `GET /progress` - Returns real-time progress of current processing
 
 **Model filtering logic:**
 - Excludes `deepseek-r1` model automatically
