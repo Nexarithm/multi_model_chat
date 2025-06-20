@@ -20,6 +20,12 @@
                 <button id="select-all" class="control-button">Select All</button>
                 <button id="deselect-all" class="control-button">Deselect All</button>
             </div>
+            <div class="combiner-section">
+                <h3>Combiner Model</h3>
+                <select id="combiner-model" class="combiner-dropdown">
+                    <option value="">Select a combiner model...</option>
+                </select>
+            </div>
             <div class="start-container">
                 <button id="start-chat" class="start-button">Start Chat</button>
             </div>
@@ -46,6 +52,7 @@
         const startChatButton = document.getElementById('start-chat');
         const selectAllButton = document.getElementById('select-all');
         const deselectAllButton = document.getElementById('deselect-all');
+        const combinerModelSelect = document.getElementById('combiner-model');
         
         const chatMessages = document.getElementById('chat-messages');
         const messageInput = document.getElementById('message-input');
@@ -53,6 +60,7 @@
 
         let availableModels = [];
         let selectedModels = [];
+        let combinerModel = null;
 
         function addMessage(message, isUser = false, isHtml = false) {
             const messageDiv = document.createElement('div');
@@ -93,7 +101,17 @@
                 .filter(cb => cb.checked)
                 .map(cb => JSON.parse(cb.value));
             
-            startChatButton.disabled = selectedModels.length === 0;
+            updateStartButton();
+        }
+
+        function updateCombinerModel() {
+            const selectedValue = combinerModelSelect.value;
+            combinerModel = selectedValue ? JSON.parse(selectedValue) : null;
+            updateStartButton();
+        }
+
+        function updateStartButton() {
+            startChatButton.disabled = selectedModels.length === 0 || !combinerModel;
         }
 
         async function loadModels() {
@@ -114,11 +132,21 @@
                         modelList.appendChild(checkboxElement);
                     });
                     
-                    // Add event listeners to checkboxes
+                    // Populate combiner model dropdown
+                    combinerModelSelect.innerHTML = '<option value="">Select a combiner model...</option>';
+                    sortedModels.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = JSON.stringify(model);
+                        option.textContent = model.display_name;
+                        combinerModelSelect.appendChild(option);
+                    });
+                    
+                    // Add event listeners
                     const checkboxes = modelList.querySelectorAll('input[type="checkbox"]');
                     checkboxes.forEach(cb => {
                         cb.addEventListener('change', updateSelectedModels);
                     });
+                    combinerModelSelect.addEventListener('change', updateCombinerModel);
                     
                     updateSelectedModels();
                     
@@ -149,7 +177,8 @@
                     },
                     body: JSON.stringify({ 
                         message: message,
-                        selected_models: selectedModels 
+                        selected_models: selectedModels,
+                        combiner_model: combinerModel
                     })
                 });
 
@@ -157,12 +186,6 @@
                 if (data.error) {
                     addMessage('Error: ' + data.error, false);
                 } else {
-                    if (data.timing_info) {
-                        const timingHtml = data.timing_info.replace(/\n/g, '<br>');
-                        addMessage(timingHtml, false, true);
-                        addMessage(`Selected response from: ${data.chosen_model}`, false);
-                        addMessage('─'.repeat(50), false);
-                    }
                     addMessage(data.response, false);
                 }
             } catch (error) {
@@ -175,7 +198,7 @@
 
         // Event listeners
         startChatButton.addEventListener('click', () => {
-            if (selectedModels.length > 0) {
+            if (selectedModels.length > 0 && combinerModel) {
                 entryPage.style.display = 'none';
                 chatPage.style.display = 'block';
                 messageInput.focus();

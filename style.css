@@ -183,6 +183,36 @@ h1 {
     background-color: #e6e0d8;
 }
 
+.combiner-section {
+    margin: 32px 0;
+    text-align: center;
+}
+
+.combiner-section h3 {
+    color: #8b7355;
+    margin: 0 0 16px 0;
+    font-size: 18px;
+    font-weight: 500;
+}
+
+.combiner-dropdown {
+    width: 100%;
+    max-width: 400px;
+    padding: 12px 16px;
+    border: 1px solid #d4c5b0;
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    background-color: #fefdfb;
+    color: #2c2318;
+    cursor: pointer;
+}
+
+.combiner-dropdown:focus {
+    outline: none;
+    border-color: #8b7355;
+}
+
 .start-container {
     text-align: center;
 }
