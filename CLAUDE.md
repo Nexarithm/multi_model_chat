@@ -16,6 +16,9 @@ pip install proxai
 ```
 The application requires the `proxai` library for multi-model AI interactions.
 
+**Check server logs:**
+The server provides detailed colored logging output showing model loading, query progress, and response timing. Monitor the console for real-time status updates.
+
 ## Architecture Overview
 
 This is a multi-model AI chat application that allows users to query multiple AI models simultaneously and combine their responses. The architecture consists of:
@@ -56,3 +59,23 @@ The application uses ProxAI (`px`) for:
 - Provider/model tuples for routing requests to specific AI services
 
 Model responses include timing information and error handling for failed queries. The combiner model receives a special prompt to synthesize multiple AI responses into a coherent answer.
+
+## File Structure
+
+- `server.py` - Main Python server handling HTTP requests, model management, and parallel querying
+- `index.html` - Frontend single-page application with model selection and chat interface  
+- `style.css` - CSS styling for the web interface
+- `README.md` - Basic project description
+
+## Key Functions and Entry Points
+
+**server.py key functions:**
+- `get_largest_models()` - Fetches and filters available AI models from ProxAI (server.py:79)
+- `query_all_models_parallel()` - Executes parallel queries to selected models (server.py:169)
+- `_process_chat_models()` - Main chat processing logic with response combination (server.py:323)
+- `run_server()` - Server initialization and startup (server.py:394)
+
+**Model filtering logic:**
+- Excludes `deepseek-r1` model automatically
+- Adds `deepseek-v3` as fallback if no deepseek models are available
+- Uses ProxAI's `model_size='largest'` parameter for model discovery
