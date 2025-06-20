@@ -47,7 +47,7 @@
         </div>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="input-container">
-            <input type="text" id="message-input" placeholder="Type your message here..." maxlength="500">
+            <input type="text" id="message-input" placeholder="Type your message here..." maxlength="5000">
             <button id="send-button">Send</button>
         </div>
     </div>
@@ -74,14 +74,57 @@
         let selectedModels = [];
         let combinerModel = null;
 
+        function parseMarkdown(text) {
+            // Handle newlines first
+            let html = text.replace(/\n/g, '<br>');
+            
+            // Bold text **text** or __text__
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+            
+            // Italic text *text* or _text_
+            html = html.replace(/(?<!\*)\*(?!\*)([^*]+)\*(?!\*)/g, '<em>$1</em>');
+            html = html.replace(/(?<!_)_(?!_)([^_]+)_(?!_)/g, '<em>$1</em>');
+            
+            // Code inline `code`
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // Handle bullet points (lines starting with - or *)
+            html = html.replace(/^[\s]*[-*]\s+(.+)$/gm, '<li>$1</li>');
+            
+            // Wrap consecutive list items in <ul>
+            html = html.replace(/(<li>.*?<\/li>)(?:\s*<br>\s*<li>.*?<\/li>)*/g, function(match) {
+                const listItems = match.replace(/<br>\s*/g, '');
+                return '<ul>' + listItems + '</ul>';
+            });
+            
+            // Handle numbered lists (lines starting with numbers)
+            html = html.replace(/^[\s]*\d+\.\s+(.+)$/gm, '<li>$1</li>');
+            
+            // Wrap consecutive numbered list items in <ol>
+            html = html.replace(/(<li>.*?<\/li>)(?:\s*<br>\s*(?=\d+\.\s))/g, function(match) {
+                return match.replace(/<br>\s*/g, '');
+            });
+            
+            return html;
+        }
+
         function addMessage(message, isUser = false, isHtml = false) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-            if (isHtml) {
-                messageDiv.innerHTML = message;
-            } else {
+            
+            if (isUser) {
+                // User messages - plain text
                 messageDiv.textContent = message;
+            } else {
+                // Bot messages - parse markdown
+                if (isHtml) {
+                    messageDiv.innerHTML = message;
+                } else {
+                    messageDiv.innerHTML = parseMarkdown(message);
+                }
             }
+            
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
