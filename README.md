@@ -14,7 +14,7 @@ Query multiple AI models simultaneously and get one intelligent combined respons
 - Track progress in real-time
 
 <div align="center">
-<img src="hero_image.png" alt="AI Chat on Steroids Demo" width="100%">
+<img src="hero_image.png" alt="AI Chat on Steroids Demo" width="40%">
 </div>
 
 ## Quick Start
