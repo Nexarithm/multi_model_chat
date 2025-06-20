@@ -74,10 +74,7 @@
         let selectedModels = [];
         let combinerModel = null;
 
-        function parseMarkdown(text) {
-            // Handle newlines first
-            let html = text.replace(/\n/g, '<br>');
-            
+        function applyBasicFormatting(html) {
             // Bold text **text** or __text__
             html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
@@ -89,6 +86,10 @@
             // Code inline `code`
             html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
             
+            return html;
+        }
+
+        function processBulletLists(html) {
             // Handle bullet points (lines starting with - or *)
             html = html.replace(/^[\s]*[-*]\s+(.+)$/gm, '<li>$1</li>');
             
@@ -98,6 +99,10 @@
                 return '<ul>' + listItems + '</ul>';
             });
             
+            return html;
+        }
+
+        function processNumberedLists(html) {
             // Handle numbered lists (lines starting with numbers)
             html = html.replace(/^[\s]*\d+\.\s+(.+)$/gm, '<li>$1</li>');
             
@@ -105,6 +110,17 @@
             html = html.replace(/(<li>.*?<\/li>)(?:\s*<br>\s*(?=\d+\.\s))/g, function(match) {
                 return match.replace(/<br>\s*/g, '');
             });
+            
+            return html;
+        }
+
+        function parseMarkdown(text) {
+            // Handle newlines first
+            let html = text.replace(/\n/g, '<br>');
+            
+            html = applyBasicFormatting(html);
+            html = processBulletLists(html);
+            html = processNumberedLists(html);
             
             return html;
         }
@@ -185,6 +201,67 @@
             }
         }
 
+        function populateModelCheckboxes(models) {
+            modelList.innerHTML = '';
+            models.forEach(model => {
+                const checkboxElement = createModelCheckbox(model);
+                modelList.appendChild(checkboxElement);
+            });
+        }
+
+        function populateCombinerDropdown(models) {
+            combinerModelSelect.innerHTML = '<option value="">Select a combiner model...</option>';
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = JSON.stringify(model);
+                option.textContent = model.display_name;
+                combinerModelSelect.appendChild(option);
+            });
+        }
+
+        function findDefaultCombiner(models) {
+            // Look for Gemini models first
+            let defaultCombiner = models.find(model => 
+                model.display_name.toLowerCase().includes('gemini')
+            );
+            
+            // If no Gemini, look for OpenAI models
+            if (!defaultCombiner) {
+                defaultCombiner = models.find(model => 
+                    model.provider.toLowerCase().includes('openai') || 
+                    model.display_name.toLowerCase().includes('openai') ||
+                    model.display_name.toLowerCase().includes('gpt')
+                );
+            }
+            
+            // If no OpenAI, look for Claude models
+            if (!defaultCombiner) {
+                defaultCombiner = models.find(model => 
+                    model.provider.toLowerCase().includes('claude') || 
+                    model.display_name.toLowerCase().includes('claude')
+                );
+            }
+            
+            return defaultCombiner;
+        }
+
+        function setupModelEventListeners() {
+            const checkboxes = modelList.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', updateSelectedModels);
+            });
+            combinerModelSelect.addEventListener('change', updateCombinerModel);
+        }
+
+        function showModelSelection() {
+            loadingSection.style.display = 'none';
+            modelSelection.style.display = 'block';
+        }
+
+        function showError(message) {
+            loadingSection.innerHTML = `<div class="loading-message error">${message}</div>`;
+        }
+
         async function loadModels() {
             try {
                 const response = await fetch('/models');
@@ -192,142 +269,118 @@
                 
                 if (data.models && data.models.length > 0) {
                     availableModels = data.models;
-                    
-                    // Sort models alphabetically by display name
                     const sortedModels = data.models.sort((a, b) => a.display_name.localeCompare(b.display_name));
                     
-                    // Create model checkboxes
-                    modelList.innerHTML = '';
-                    sortedModels.forEach(model => {
-                        const checkboxElement = createModelCheckbox(model);
-                        modelList.appendChild(checkboxElement);
-                    });
+                    populateModelCheckboxes(sortedModels);
+                    populateCombinerDropdown(sortedModels);
                     
-                    // Populate combiner model dropdown
-                    combinerModelSelect.innerHTML = '<option value="">Select a combiner model...</option>';
-                    sortedModels.forEach(model => {
-                        const option = document.createElement('option');
-                        option.value = JSON.stringify(model);
-                        option.textContent = model.display_name;
-                        combinerModelSelect.appendChild(option);
-                    });
-                    
-                    // Set default combiner model: Gemini → OpenAI → Claude
-                    let defaultCombiner = null;
-                    
-                    // Look for Gemini models first
-                    defaultCombiner = sortedModels.find(model => 
-                        model.display_name.toLowerCase().includes('gemini')
-                    );
-                    
-                    // If no Gemini, look for OpenAI models
-                    if (!defaultCombiner) {
-                        defaultCombiner = sortedModels.find(model => 
-                            model.provider.toLowerCase().includes('openai') || 
-                            model.display_name.toLowerCase().includes('openai') ||
-                            model.display_name.toLowerCase().includes('gpt')
-                        );
-                    }
-                    
-                    // If no OpenAI, look for Claude models
-                    if (!defaultCombiner) {
-                        defaultCombiner = sortedModels.find(model => 
-                            model.provider.toLowerCase().includes('claude') || 
-                            model.display_name.toLowerCase().includes('claude')
-                        );
-                    }
-                    
-                    // Set the default if found
+                    const defaultCombiner = findDefaultCombiner(sortedModels);
                     if (defaultCombiner) {
                         combinerModelSelect.value = JSON.stringify(defaultCombiner);
                     }
                     
-                    // Add event listeners
-                    const checkboxes = modelList.querySelectorAll('input[type="checkbox"]');
-                    checkboxes.forEach(cb => {
-                        cb.addEventListener('change', updateSelectedModels);
-                    });
-                    combinerModelSelect.addEventListener('change', updateCombinerModel);
-                    
+                    setupModelEventListeners();
                     updateSelectedModels();
                     updateCombinerModel();
-                    
-                    // Show model selection
-                    loadingSection.style.display = 'none';
-                    modelSelection.style.display = 'block';
+                    showModelSelection();
                 } else {
-                    loadingSection.innerHTML = '<div class="loading-message error">No models available. Please try again later.</div>';
+                    showError('No models available. Please try again later.');
                 }
             } catch (error) {
-                loadingSection.innerHTML = '<div class="loading-message error">Error loading models. Please try again later.</div>';
+                showError('Error loading models. Please try again later.');
             }
         }
 
-        async function sendMessage() {
+        function prepareMessageForSending() {
             const message = messageInput.value.trim();
-            if (!message) return;
+            if (!message) return null;
 
             addMessage(message, true);
             messageInput.value = '';
             sendButton.disabled = true;
+            
+            return message;
+        }
 
-            try {
-                const response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ 
-                        message: message,
-                        selected_models: selectedModels,
-                        combiner_model: combinerModel
-                    })
-                });
+        async function sendChatRequest(message) {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    message: message,
+                    selected_models: selectedModels,
+                    combiner_model: combinerModel
+                })
+            });
+            return await response.json();
+        }
 
-                const data = await response.json();
-                if (data.error) {
-                    addMessage('Error: ' + data.error, false);
-                } else {
-                    addMessage(data.response, false);
-                }
-            } catch (error) {
-                addMessage('Error: Could not connect to server', false);
-            } finally {
-                sendButton.disabled = false;
-                messageInput.focus();
+        function handleChatResponse(data) {
+            if (data.error) {
+                addMessage('Error: ' + data.error, false);
+            } else {
+                addMessage(data.response, false);
             }
         }
 
-        // Event listeners
-        startChatButton.addEventListener('click', () => {
+        function resetMessageInput() {
+            sendButton.disabled = false;
+            messageInput.focus();
+        }
+
+        async function sendMessage() {
+            const message = prepareMessageForSending();
+            if (!message) return;
+
+            try {
+                const data = await sendChatRequest(message);
+                handleChatResponse(data);
+            } catch (error) {
+                addMessage('Error: Could not connect to server', false);
+            } finally {
+                resetMessageInput();
+            }
+        }
+
+        function handleStartChat() {
             if (selectedModels.length > 0 && combinerModel) {
                 updateMetadataDisplay();
                 entryPage.style.display = 'none';
                 chatPage.style.display = 'block';
                 messageInput.focus();
             }
-        });
+        }
 
-        selectAllButton.addEventListener('click', () => {
+        function selectAllModels() {
             const checkboxes = modelList.querySelectorAll('input[type="checkbox"]');
             checkboxes.forEach(cb => cb.checked = true);
             updateSelectedModels();
-        });
+        }
 
-        deselectAllButton.addEventListener('click', () => {
+        function deselectAllModels() {
             const checkboxes = modelList.querySelectorAll('input[type="checkbox"]');
             checkboxes.forEach(cb => cb.checked = false);
             updateSelectedModels();
-        });
+        }
 
-        sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', (e) => {
+        function handleKeyPress(e) {
             if (e.key === 'Enter') {
                 sendMessage();
             }
-        });
+        }
+
+        function setupGlobalEventListeners() {
+            startChatButton.addEventListener('click', handleStartChat);
+            selectAllButton.addEventListener('click', selectAllModels);
+            deselectAllButton.addEventListener('click', deselectAllModels);
+            sendButton.addEventListener('click', sendMessage);
+            messageInput.addEventListener('keypress', handleKeyPress);
+        }
 
         // Initialize
+        setupGlobalEventListeners();
         loadModels();
     </script>
 </body>
