@@ -6,6 +6,7 @@ import time
 import random
 import threading
 import uuid
+import os
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
@@ -175,6 +176,13 @@ def _create_error_result(model, error, time_taken):
 
 def query_single_model(model, user_message, chat_history):
     """Query a single model and return result with timing"""
+    # Ensure ProxAI connection in thread for multiprocessing compatibility
+    px.connect(
+        experiment_path='multi_model_chat/version_1',
+        proxdash_options=px.ProxDashOptions(
+            api_key=os.getenv('PROXDASH_API_KEY'),
+        ))
+
     model_name = f"{model['provider']}/{model['model']}"
     log_message('INFO', f'🚀 Querying {model_name}...')
 
@@ -210,7 +218,7 @@ def query_single_model(model, user_message, chat_history):
 def query_all_models_parallel(available_models, user_message, chat_history):
     """Query all models in parallel and return results"""
     global current_progress
-    
+
     log_message('INFO', f'🌟 Starting parallel query of {len(available_models)} models...')
 
     # Initialize progress tracking
@@ -250,7 +258,7 @@ def query_all_models_parallel(available_models, user_message, chat_history):
                 current_progress['successful_models'] += 1
             else:
                 current_progress['failed_models'] += 1
-            
+
             current_progress['completed_responses'].append({
                 'model_name': f"{result['model']['provider']}/{result['model']['model']}",
                 'success': result['success'],
@@ -300,17 +308,17 @@ def _serve_progress_json(handler):
     """Serve the current progress as JSON"""
     global current_progress
     client_ip = handler.client_address[0]
-    
+
     # Calculate elapsed time if processing
     progress_copy = current_progress.copy()
     if progress_copy['start_time']:
         progress_copy['elapsed_time'] = int(time.time() - progress_copy['start_time'])
     else:
         progress_copy['elapsed_time'] = 0
-    
+
     # Remove start_time from response (not needed on frontend)
     progress_copy.pop('start_time', None)
-    
+
     handler.send_response(200)
     handler.send_header('Content-type', 'application/json')
     handler.end_headers()
@@ -320,26 +328,26 @@ def _serve_job_status(handler, job_id):
     """Serve job status as JSON"""
     client_ip = handler.client_address[0]
     job = get_job(job_id)
-    
+
     if not job:
         handler.send_response(404)
         handler.send_header('Content-type', 'application/json')
         handler.end_headers()
         handler.wfile.write(json.dumps({'error': 'Job not found'}).encode())
         return
-    
+
     # Create response without internal fields
     response = {
         'id': job['id'],
         'status': job['status'],
         'created_at': job['created_at']
     }
-    
+
     if job['status'] == 'completed' and job['result']:
         response['result'] = job['result']
     elif job['status'] == 'error' and job['error']:
         response['error'] = job['error']
-    
+
     handler.send_response(200)
     handler.send_header('Content-type', 'application/json')
     handler.end_headers()
@@ -429,7 +437,7 @@ IMPORTANT GUIDELINES:
 def _combine_responses_with_model(combiner_model, combiner_chat_history):
     """Use combiner model to synthesize responses"""
     global current_progress
-    
+
     combiner_name = f"{combiner_model['provider']}/{combiner_model['model']}"
     log_message('INFO', f'🔗 Combining responses with {combiner_name}...')
 
@@ -472,8 +480,14 @@ def _process_chat_models_async(job_id, request_data):
     global chat_history
 
     try:
+        # Ensure ProxAI connection in thread for multiprocessing compatibility
+        px.connect(
+            experiment_path='multi_model_chat/version_1',
+            proxdash_options=px.ProxDashOptions(
+                api_key=os.getenv('PROXDASH_API_KEY'),
+            ))
         update_job(job_id, status='processing')
-        
+
         user_message = request_data['user_message']
         selected_models = request_data['selected_models']
         combiner_model = request_data['combiner_model']
@@ -520,12 +534,12 @@ def _process_chat_models_async(job_id, request_data):
             'current_stage': 'completed',
             'is_processing': False
         })
-        
+
         chat_history.append({"role": "assistant", "content": combined_response})
         update_job(job_id, status='completed', result=combined_response)
-        
+
         log_message('SUCCESS', f'✅ Job {job_id} completed successfully')
-        
+
     except Exception as e:
         log_message('ERROR', f'❌ Job {job_id} failed: {str(e)}')
         update_job(job_id, status='error', error=str(e))
@@ -538,12 +552,12 @@ def _process_chat_models_async(job_id, request_data):
 def _process_chat_models(request_data):
     """Create async job and return job ID immediately"""
     job_id = create_job(request_data)
-    
+
     # Start processing in background thread
     thread = threading.Thread(target=_process_chat_models_async, args=(job_id, request_data))
     thread.daemon = True
     thread.start()
-    
+
     return {'job_id': job_id}, 200
 
 def _send_json_response(handler, response_data, status_code):
@@ -573,6 +587,14 @@ def _handle_chat_request(handler):
 def run_server():
     global available_models
     log_message('INFO', '🚀 Starting Multi-Model AI Chat Server...')
+
+    # Initialize ProxAI connection with experiment tracking
+    px.connect(
+        experiment_path='multi_model_chat/version_1',
+        proxdash_options=px.ProxDashOptions(
+            api_key=os.getenv('PROXDASH_API_KEY'),
+        ))
+    log_message('SUCCESS', '✅ ProxAI connection initialized with experiment tracking')
 
     available_models = get_largest_models()
 
