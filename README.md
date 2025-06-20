@@ -12,7 +12,7 @@ Query multiple AI models simultaneously and get one intelligent combined respons
 - Track progress in real-time
 
 <div align="center">
-<img src="hero_image.png" alt="AI Chat on Steroids Demo" width="50%">
+<img src="hero_image.png" alt="AI Chat on Steroids Demo" width="100%">
 </div>
 
 ## Quick Start
@@ -34,7 +34,7 @@ open http://localhost:3000
 ```
 
 <div align="center">
-<img src="use_case.gif" alt="AI Chat on Steroids Demo" width="80%">
+<img src="use_case.gif" alt="AI Chat on Steroids Demo" width="100%">
 </div>
 
 ## Pro Tip: Use ProxDash
