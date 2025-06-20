@@ -141,6 +141,36 @@
                         combinerModelSelect.appendChild(option);
                     });
                     
+                    // Set default combiner model: Gemini → OpenAI → Claude
+                    let defaultCombiner = null;
+                    
+                    // Look for Gemini models first
+                    defaultCombiner = sortedModels.find(model => 
+                        model.display_name.toLowerCase().includes('gemini')
+                    );
+                    
+                    // If no Gemini, look for OpenAI models
+                    if (!defaultCombiner) {
+                        defaultCombiner = sortedModels.find(model => 
+                            model.provider.toLowerCase().includes('openai') || 
+                            model.display_name.toLowerCase().includes('openai') ||
+                            model.display_name.toLowerCase().includes('gpt')
+                        );
+                    }
+                    
+                    // If no OpenAI, look for Claude models
+                    if (!defaultCombiner) {
+                        defaultCombiner = sortedModels.find(model => 
+                            model.provider.toLowerCase().includes('claude') || 
+                            model.display_name.toLowerCase().includes('claude')
+                        );
+                    }
+                    
+                    // Set the default if found
+                    if (defaultCombiner) {
+                        combinerModelSelect.value = JSON.stringify(defaultCombiner);
+                    }
+                    
                     // Add event listeners
                     const checkboxes = modelList.querySelectorAll('input[type="checkbox"]');
                     checkboxes.forEach(cb => {
@@ -149,6 +179,7 @@
                     combinerModelSelect.addEventListener('change', updateCombinerModel);
                     
                     updateSelectedModels();
+                    updateCombinerModel();
                     
                     // Show model selection
                     loadingSection.style.display = 'none';
