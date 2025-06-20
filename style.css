@@ -352,3 +352,167 @@ h1 {
     font-weight: 500;
     display: inline-block;
 }
+
+/* Status Display Styles */
+.status-display {
+    position: fixed;
+    top: 120px;
+    right: 16px;
+    width: 320px;
+    background-color: #f0ede8;
+    border: 1px solid #d4c5b0;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 200;
+    font-size: 12px;
+    color: #2c2318;
+}
+
+.status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #e6e0d8;
+    border-bottom: 1px solid #d4c5b0;
+    border-radius: 8px 8px 0 0;
+}
+
+.status-title {
+    font-weight: 600;
+    color: #8b7355;
+    font-size: 13px;
+}
+
+.status-close {
+    cursor: pointer;
+    font-size: 16px;
+    color: #8b7355;
+    font-weight: bold;
+    padding: 0 4px;
+    line-height: 1;
+    border-radius: 3px;
+}
+
+.status-close:hover {
+    background-color: #d4c5b0;
+}
+
+.status-content {
+    padding: 12px;
+}
+
+.status-main {
+    margin-bottom: 12px;
+}
+
+.status-message {
+    font-size: 13px;
+    color: #2c2318;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.status-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 8px;
+    background-color: #d4c5b0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: #8b7355;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 11px;
+    color: #8b7355;
+    font-weight: 600;
+    min-width: 30px;
+}
+
+.status-details {
+    border-top: 1px solid #d4c5b0;
+    padding-top: 8px;
+}
+
+.status-stats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+    justify-content: space-between;
+}
+
+.status-stat {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background-color: #e6e0d8;
+    color: #2c2318;
+}
+
+.status-stat.success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-stat.failed {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.completed-models {
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.completed-model {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    font-size: 11px;
+}
+
+.completed-model.success .model-icon {
+    color: #28a745;
+}
+
+.completed-model.failed .model-icon {
+    color: #dc3545;
+}
+
+.model-icon {
+    font-weight: bold;
+    width: 12px;
+    text-align: center;
+}
+
+.model-name {
+    color: #2c2318;
+    flex: 1;
+    font-size: 10px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .status-display {
+        position: fixed;
+        top: auto;
+        bottom: 90px;
+        right: 8px;
+        left: 8px;
+        width: auto;
+    }
+}

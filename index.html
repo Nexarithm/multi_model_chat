@@ -45,6 +45,31 @@
                 <div id="combiner-model-display" class="combiner-display"></div>
             </div>
         </div>
+        <div id="status-display" class="status-display" style="display: none;">
+            <div class="status-header">
+                <span class="status-title">Processing Status</span>
+                <span class="status-close" onclick="hideStatus()">×</span>
+            </div>
+            <div class="status-content">
+                <div class="status-main">
+                    <div id="status-message" class="status-message">Preparing models...</div>
+                    <div id="status-progress" class="status-progress">
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+                        </div>
+                        <div id="progress-text" class="progress-text">0/0</div>
+                    </div>
+                </div>
+                <div class="status-details">
+                    <div class="status-stats">
+                        <span id="status-elapsed" class="status-stat">0.0s</span>
+                        <span id="status-success" class="status-stat success">✓ 0</span>
+                        <span id="status-failed" class="status-stat failed">✗ 0</span>
+                    </div>
+                    <div id="completed-models" class="completed-models"></div>
+                </div>
+            </div>
+        </div>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="input-container">
             <input type="text" id="message-input" placeholder="Type your message here...">
@@ -69,10 +94,22 @@
         const sendButton = document.getElementById('send-button');
         const selectedModelsList = document.getElementById('selected-models-list');
         const combinerModelDisplay = document.getElementById('combiner-model-display');
+        
+        // Status display elements
+        const statusDisplay = document.getElementById('status-display');
+        const statusMessage = document.getElementById('status-message');
+        const statusProgress = document.getElementById('status-progress');
+        const progressFill = document.getElementById('progress-fill');
+        const progressText = document.getElementById('progress-text');
+        const statusElapsed = document.getElementById('status-elapsed');
+        const statusSuccess = document.getElementById('status-success');
+        const statusFailed = document.getElementById('status-failed');
+        const completedModels = document.getElementById('completed-models');
 
         let availableModels = [];
         let selectedModels = [];
         let combinerModel = null;
+        let progressPollingInterval = null;
 
         function applyBasicFormatting(html) {
             // Bold text **text** or __text__
@@ -317,28 +354,181 @@
             return await response.json();
         }
 
-        function handleChatResponse(data) {
-            if (data.error) {
-                addMessage('Error: ' + data.error, false);
-            } else {
-                addMessage(data.response, false);
+        async function pollJobStatus(jobId) {
+            try {
+                const response = await fetch(`/job/${jobId}`);
+                const job = await response.json();
+                return job;
+            } catch (error) {
+                console.error('Error polling job status:', error);
+                return null;
             }
         }
+
+        async function waitForJobCompletion(jobId) {
+            return new Promise((resolve, reject) => {
+                const checkJob = async () => {
+                    const job = await pollJobStatus(jobId);
+                    
+                    if (!job) {
+                        reject(new Error('Failed to poll job status'));
+                        return;
+                    }
+                    
+                    if (job.status === 'completed') {
+                        resolve(job.result);
+                    } else if (job.status === 'error') {
+                        reject(new Error(job.error || 'Job failed'));
+                    } else {
+                        // Job still processing, check again
+                        setTimeout(checkJob, 1000); // Check every second
+                    }
+                };
+                
+                checkJob();
+            });
+        }
+
 
         function resetMessageInput() {
             sendButton.disabled = false;
             messageInput.focus();
         }
 
+        function showStatus() {
+            statusDisplay.style.display = 'block';
+            updateStatusDisplay({
+                is_processing: true,
+                current_stage: 'querying',
+                total_models: selectedModels.length,
+                completed_models: 0,
+                successful_models: 0,
+                failed_models: 0,
+                elapsed_time: 0,
+                completed_responses: []
+            });
+        }
+
+        function hideStatus() {
+            statusDisplay.style.display = 'none';
+            if (progressPollingInterval) {
+                clearInterval(progressPollingInterval);
+                progressPollingInterval = null;
+            }
+        }
+
+        function updateStatusDisplay(progress) {
+            if (!progress.is_processing && progress.current_stage === 'idle') {
+                hideStatus();
+                return;
+            }
+
+            // Update status message based on stage
+            let message = '';
+            switch (progress.current_stage) {
+                case 'querying':
+                    message = `Collecting responses from ${progress.total_models} models...`;
+                    break;
+                case 'combining':
+                    message = 'Combiner model is processing responses...';
+                    break;
+                case 'completed':
+                    message = 'Response completed!';
+                    break;
+                default:
+                    message = 'Processing...';
+            }
+            statusMessage.textContent = message;
+
+            // Update progress bar
+            const percentage = progress.total_models > 0 ? 
+                (progress.completed_models / progress.total_models) * 100 : 0;
+            progressFill.style.width = `${percentage}%`;
+            progressText.textContent = `${progress.completed_models}/${progress.total_models}`;
+
+            // Update stats
+            statusElapsed.textContent = `${progress.elapsed_time}s`;
+            statusSuccess.textContent = `✓ ${progress.successful_models}`;
+            statusFailed.textContent = `✗ ${progress.failed_models}`;
+
+            // Update completed models list
+            completedModels.innerHTML = '';
+            if (progress.completed_responses && progress.completed_responses.length > 0) {
+                progress.completed_responses.forEach(response => {
+                    const modelItem = document.createElement('div');
+                    modelItem.className = `completed-model ${response.success ? 'success' : 'failed'}`;
+                    modelItem.innerHTML = `
+                        <span class="model-icon">${response.success ? '✓' : '✗'}</span>
+                        <span class="model-name">${response.display_name}</span>
+                    `;
+                    completedModels.appendChild(modelItem);
+                });
+            }
+
+            // Hide status when completed after a delay
+            if (progress.current_stage === 'completed') {
+                setTimeout(() => {
+                    hideStatus();
+                }, 3000);
+            }
+        }
+
+        async function pollProgress() {
+            try {
+                const response = await fetch('/progress');
+                const progress = await response.json();
+                updateStatusDisplay(progress);
+                
+                if (!progress.is_processing || progress.current_stage === 'completed') {
+                    clearInterval(progressPollingInterval);
+                    progressPollingInterval = null;
+                }
+            } catch (error) {
+                console.error('Error polling progress:', error);
+            }
+        }
+
+        function startProgressPolling() {
+            if (progressPollingInterval) {
+                clearInterval(progressPollingInterval);
+            }
+            progressPollingInterval = setInterval(pollProgress, 500); // Poll every 500ms
+        }
+
         async function sendMessage() {
             const message = prepareMessageForSending();
             if (!message) return;
 
+            // Show status and start polling
+            showStatus();
+            startProgressPolling();
+
             try {
+                // Send chat request to get job ID
                 const data = await sendChatRequest(message);
-                handleChatResponse(data);
+                
+                if (data.error) {
+                    addMessage('Error: ' + data.error, false);
+                    hideStatus();
+                    resetMessageInput();
+                    return;
+                }
+                
+                if (!data.job_id) {
+                    addMessage('Error: No job ID received', false);
+                    hideStatus();
+                    resetMessageInput();
+                    return;
+                }
+                
+                // Wait for job completion
+                const result = await waitForJobCompletion(data.job_id);
+                addMessage(result, false);
+                
             } catch (error) {
-                addMessage('Error: Could not connect to server', false);
+                console.error('Chat error:', error);
+                addMessage('Error: ' + error.message, false);
+                hideStatus(); // Hide status on error
             } finally {
                 resetMessageInput();
             }
@@ -378,6 +568,9 @@
             sendButton.addEventListener('click', sendMessage);
             messageInput.addEventListener('keypress', handleKeyPress);
         }
+
+        // Global functions for HTML onclick handlers
+        window.hideStatus = hideStatus;
 
         // Initialize
         setupGlobalEventListeners();

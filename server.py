@@ -4,12 +4,28 @@ import proxai as px
 import concurrent.futures
 import time
 import random
+import threading
+import uuid
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 chat_history = []
 available_models = []
+current_progress = {
+    'is_processing': False,
+    'total_models': 0,
+    'completed_models': 0,
+    'successful_models': 0,
+    'failed_models': 0,
+    'current_stage': 'idle',  # 'querying', 'combining', 'completed'
+    'start_time': None,
+    'completed_responses': []
+}
+
+# Job tracking system
+jobs = {}  # job_id -> job_info
+job_lock = threading.Lock()
 
 def _get_log_colors():
     """Get color codes for log levels"""
@@ -44,6 +60,31 @@ def log_message(level, message, details=None):
 
     if details:
         _format_log_details(details, color, reset)
+
+def create_job(request_data):
+    """Create a new job and return job ID"""
+    job_id = str(uuid.uuid4())
+    with job_lock:
+        jobs[job_id] = {
+            'id': job_id,
+            'status': 'pending',  # 'pending', 'processing', 'completed', 'error'
+            'result': None,
+            'error': None,
+            'created_at': time.time(),
+            'request_data': request_data
+        }
+    return job_id
+
+def get_job(job_id):
+    """Get job information"""
+    with job_lock:
+        return jobs.get(job_id)
+
+def update_job(job_id, **updates):
+    """Update job information"""
+    with job_lock:
+        if job_id in jobs:
+            jobs[job_id].update(updates)
 
 def _should_skip_model(provider, model_name):
     """Check if a model should be skipped during selection"""
@@ -168,7 +209,21 @@ def query_single_model(model, user_message, chat_history):
 
 def query_all_models_parallel(available_models, user_message, chat_history):
     """Query all models in parallel and return results"""
+    global current_progress
+    
     log_message('INFO', f'🌟 Starting parallel query of {len(available_models)} models...')
+
+    # Initialize progress tracking
+    current_progress.update({
+        'is_processing': True,
+        'total_models': len(available_models),
+        'completed_models': 0,
+        'successful_models': 0,
+        'failed_models': 0,
+        'current_stage': 'querying',
+        'start_time': time.time(),
+        'completed_responses': []
+    })
 
     results = []
     start_time = time.time()
@@ -188,6 +243,19 @@ def query_all_models_parallel(available_models, user_message, chat_history):
             result = future.result()
             results.append(result)
             completed_count += 1
+
+            # Update progress
+            current_progress['completed_models'] = completed_count
+            if result['success']:
+                current_progress['successful_models'] += 1
+            else:
+                current_progress['failed_models'] += 1
+            
+            current_progress['completed_responses'].append({
+                'model_name': f"{result['model']['provider']}/{result['model']['model']}",
+                'success': result['success'],
+                'display_name': result['model']['display_name']
+            })
 
             model_name = f"{result['model']['provider']}/{result['model']['model']}"
             status = "✅" if result['success'] else "❌"
@@ -228,6 +296,55 @@ def _serve_models_json(handler):
     handler.end_headers()
     handler.wfile.write(json.dumps({'models': available_models}).encode())
 
+def _serve_progress_json(handler):
+    """Serve the current progress as JSON"""
+    global current_progress
+    client_ip = handler.client_address[0]
+    
+    # Calculate elapsed time if processing
+    progress_copy = current_progress.copy()
+    if progress_copy['start_time']:
+        progress_copy['elapsed_time'] = int(time.time() - progress_copy['start_time'])
+    else:
+        progress_copy['elapsed_time'] = 0
+    
+    # Remove start_time from response (not needed on frontend)
+    progress_copy.pop('start_time', None)
+    
+    handler.send_response(200)
+    handler.send_header('Content-type', 'application/json')
+    handler.end_headers()
+    handler.wfile.write(json.dumps(progress_copy).encode())
+
+def _serve_job_status(handler, job_id):
+    """Serve job status as JSON"""
+    client_ip = handler.client_address[0]
+    job = get_job(job_id)
+    
+    if not job:
+        handler.send_response(404)
+        handler.send_header('Content-type', 'application/json')
+        handler.end_headers()
+        handler.wfile.write(json.dumps({'error': 'Job not found'}).encode())
+        return
+    
+    # Create response without internal fields
+    response = {
+        'id': job['id'],
+        'status': job['status'],
+        'created_at': job['created_at']
+    }
+    
+    if job['status'] == 'completed' and job['result']:
+        response['result'] = job['result']
+    elif job['status'] == 'error' and job['error']:
+        response['error'] = job['error']
+    
+    handler.send_response(200)
+    handler.send_header('Content-type', 'application/json')
+    handler.end_headers()
+    handler.wfile.write(json.dumps(response).encode())
+
 def _serve_404(handler):
     """Serve 404 error response"""
     client_ip = handler.client_address[0]
@@ -243,6 +360,11 @@ class ChatHandler(BaseHTTPRequestHandler):
             _serve_file(self, 'style.css', 'text/css', '🎨', 'Serving CSS')
         elif self.path == '/models':
             _serve_models_json(self)
+        elif self.path == '/progress':
+            _serve_progress_json(self)
+        elif self.path.startswith('/job/'):
+            job_id = self.path[5:]  # Remove '/job/' prefix
+            _serve_job_status(self, job_id)
         else:
             _serve_404(self)
 
@@ -306,8 +428,13 @@ IMPORTANT GUIDELINES:
 
 def _combine_responses_with_model(combiner_model, combiner_chat_history):
     """Use combiner model to synthesize responses"""
+    global current_progress
+    
     combiner_name = f"{combiner_model['provider']}/{combiner_model['model']}"
     log_message('INFO', f'🔗 Combining responses with {combiner_name}...')
+
+    # Update progress to combining stage
+    current_progress['current_stage'] = 'combining'
 
     start_combine_time = time.time()
     combined_response = px.generate_text(
@@ -340,52 +467,84 @@ def _fallback_to_random_response(successful_results):
 
     return chosen_response
 
-def _process_chat_models(request_data):
-    """Process chat request with multiple models"""
+def _process_chat_models_async(job_id, request_data):
+    """Process chat request with multiple models asynchronously"""
     global chat_history
 
-    user_message = request_data['user_message']
-    selected_models = request_data['selected_models']
-    combiner_model = request_data['combiner_model']
-
-    log_message('INFO', f'💬 Received chat message from user', {
-        'Message length': f'{len(user_message)} chars',
-        'Selected models': len(selected_models),
-        'Combiner model': f"{combiner_model['provider']}/{combiner_model['model']}"
-    })
-
-    chat_history.append({"role": "user", "content": user_message})
-
-    # Query selected models in parallel
-    start_total_time = time.time()
-    results = query_all_models_parallel(selected_models, user_message, chat_history)
-    total_time = round(time.time() - start_total_time, 2)
-
-    # Filter successful responses
-    successful_results = [r for r in results if r['success']]
-    failed_results = [r for r in results if not r['success']]
-
-    if not successful_results:
-        log_message('ERROR', '💥 All models failed to respond!')
-        return {'error': 'All models failed to respond'}, 500
-
-    log_message('SUCCESS', f'🎯 Preparing response combination', {
-        'Successful responses': len(successful_results),
-        'Failed responses': len(failed_results)
-    })
-
-    # Create combining prompt and get combined response
-    combining_prompt = _create_combining_prompt(user_message, successful_results)
-    combiner_chat_history = chat_history + [{"role": "user", "content": combining_prompt}]
-
     try:
-        combined_response = _combine_responses_with_model(combiner_model, combiner_chat_history)
-    except Exception as e:
-        log_message('ERROR', f'❌ Combiner model failed: {str(e)}')
-        combined_response = _fallback_to_random_response(successful_results)
+        update_job(job_id, status='processing')
+        
+        user_message = request_data['user_message']
+        selected_models = request_data['selected_models']
+        combiner_model = request_data['combiner_model']
 
-    chat_history.append({"role": "assistant", "content": combined_response})
-    return {'response': combined_response}, 200
+        log_message('INFO', f'💬 Processing async chat job {job_id}', {
+            'Message length': f'{len(user_message)} chars',
+            'Selected models': len(selected_models),
+            'Combiner model': f"{combiner_model['provider']}/{combiner_model['model']}"
+        })
+
+        chat_history.append({"role": "user", "content": user_message})
+
+        # Query selected models in parallel
+        start_total_time = time.time()
+        results = query_all_models_parallel(selected_models, user_message, chat_history)
+        total_time = round(time.time() - start_total_time, 2)
+
+        # Filter successful responses
+        successful_results = [r for r in results if r['success']]
+        failed_results = [r for r in results if not r['success']]
+
+        if not successful_results:
+            log_message('ERROR', '💥 All models failed to respond!')
+            update_job(job_id, status='error', error='All models failed to respond')
+            return
+
+        log_message('SUCCESS', f'🎯 Preparing response combination', {
+            'Successful responses': len(successful_results),
+            'Failed responses': len(failed_results)
+        })
+
+        # Create combining prompt and get combined response
+        combining_prompt = _create_combining_prompt(user_message, successful_results)
+        combiner_chat_history = chat_history + [{"role": "user", "content": combining_prompt}]
+
+        try:
+            combined_response = _combine_responses_with_model(combiner_model, combiner_chat_history)
+        except Exception as e:
+            log_message('ERROR', f'❌ Combiner model failed: {str(e)}')
+            combined_response = _fallback_to_random_response(successful_results)
+
+        # Mark processing as completed
+        current_progress.update({
+            'current_stage': 'completed',
+            'is_processing': False
+        })
+        
+        chat_history.append({"role": "assistant", "content": combined_response})
+        update_job(job_id, status='completed', result=combined_response)
+        
+        log_message('SUCCESS', f'✅ Job {job_id} completed successfully')
+        
+    except Exception as e:
+        log_message('ERROR', f'❌ Job {job_id} failed: {str(e)}')
+        update_job(job_id, status='error', error=str(e))
+        # Reset progress on error
+        current_progress.update({
+            'current_stage': 'idle',
+            'is_processing': False
+        })
+
+def _process_chat_models(request_data):
+    """Create async job and return job ID immediately"""
+    job_id = create_job(request_data)
+    
+    # Start processing in background thread
+    thread = threading.Thread(target=_process_chat_models_async, args=(job_id, request_data))
+    thread.daemon = True
+    thread.start()
+    
+    return {'job_id': job_id}, 200
 
 def _send_json_response(handler, response_data, status_code):
     """Send JSON response with proper headers"""
