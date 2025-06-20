@@ -278,11 +278,31 @@ def _create_combining_prompt(user_message, successful_results):
     for result in successful_results:
         model_responses.append(f"Model: {result['model']['display_name']}\nResponse: {result['response']}")
 
-    return f"""For the given chat history and the following responses from different AI models, compose one comprehensive answer to the user that synthesizes all important information from the different AI model responses. Respond naturally as if you are having a conversation, without mentioning that you are combining responses.
+    return f"""Analyze the following responses from different AI models and provide a concise, structured summary that prioritizes the most valuable information:
+
+1. FIRST: Identify the most common answer or consensus among the models
+2. THEN: Only highlight truly valuable, unique insights that add significant value beyond the consensus
+3. IMPORTANT: Skip any model contributions that are redundant, trivial, or don't add meaningful value
 
 Query: {user_message}
 
-{chr(10).join(model_responses)}"""
+Model Responses:
+{chr(10).join(model_responses)}
+
+Please format your response as follows:
+
+**Summary of all models:** [Provide a clear, comprehensive summary of the consensus answer]
+
+**Additional valuable insights:** (Only include if there are genuinely useful unique contributions)
+- **[Model Name]:** [direct unique contribution without redundant phrases]
+- **[Model Name]:** [another valuable unique insight]
+
+IMPORTANT GUIDELINES:
+- Keep the response concise and focused on the most useful information
+- Only mention models in "Additional insights" if they provide genuinely valuable unique information
+- If no models provide meaningful additional insights beyond the consensus, omit the "Additional insights" section entirely
+- Prioritize quality over quantity - better to have fewer, more valuable insights than many trivial ones
+- Do not repeat information already covered in the main summary"""
 
 def _combine_responses_with_model(combiner_model, combiner_chat_history):
     """Use combiner model to synthesize responses"""
@@ -291,7 +311,7 @@ def _combine_responses_with_model(combiner_model, combiner_chat_history):
 
     start_combine_time = time.time()
     combined_response = px.generate_text(
-        system="You are a helpful AI assistant. Synthesize information from multiple AI responses into one coherent, natural conversation response. Do not mention that you are combining responses - just provide a helpful, comprehensive answer.",
+        system="You are an expert AI response analyzer focused on extracting maximum value from multiple model outputs. Your key responsibilities: 1) Identify and summarize the consensus among models, 2) Filter out redundant or low-value information, 3) Only highlight truly valuable unique insights that add significant meaning beyond the consensus. Be selective and quality-focused - it's better to omit trivial contributions than to overcrowd the response. Prioritize clarity, conciseness, and genuine value.",
         messages=combiner_chat_history,
         provider_model=(combiner_model['provider'], combiner_model['model']),
         max_tokens=800,
