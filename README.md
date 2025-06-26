@@ -1,6 +1,8 @@
 # AI Chat on Steroids! 🚀
 
-Query multiple AI models simultaneously and get one intelligent combined response. Built entirely with **Claude Code** and **[ProxAI](https://www.proxai.co)**.
+Query multiple AI models simultaneously and get one intelligent combined response.
+- Built entirely with **[Claude Code](https://www.anthropic.com/claude-code)** and **[ProxAI](https://www.proxai.co)**.
+- Read blog post for the full story behind this project: **[How I Built a Multi-Model AI Chat App](https://www.proxai.co/blog/archive/multi-model-ai-chat-app)**.
 
 <div align="center">
 <strong>⭐⭐ This repo created via Vibe Coding! Zero hands-on code changes made! ⭐⭐</strong>
